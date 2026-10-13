@@ -1,0 +1,8 @@
+<resources>
+    <style name="Base.Theme.RotineWater" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/water_blue</item>
+        <item name="android:windowBackground">@color/screen_background</item>
+    </style>
+
+    <style name="Theme.RotineWater" parent="Base.Theme.RotineWater" />
+</resources>
