@@ -8,7 +8,9 @@ Projeto acadêmico, feito para praticar views customizadas, animações e persis
 
 - **Meta diária editável**: pode ser alterada a qualquer momento, sem perder os registros já feitos no dia.
 - **Registro de consumo**: informe o volume em ml e cada registro guarda o volume e o horário.
-- **Gráfico circular animado**: o arco de progresso cresce suavemente a cada novo registro.
+- **Interface moderna**: tema escuro azul-marinho, cartões arredondados, botões em pílula, tiles de estatística (meta, consumido, restante) e linhas de registro com ícone de gota.
+- **Gráfico circular animado**: anel com gradiente e uma bolinha na ponta do arco, que cresce suavemente a cada novo registro. Uma linha de apoio mostra `Faltam X ml` ou `Meta atingida!`.
+- **Atalhos de volume**: botões `+200 ml`, `+300 ml` e `+500 ml` registram com um toque, além do campo para digitar qualquer volume.
 - **Alerta de meta ultrapassada**: o progresso pode passar de 100%. Nesse caso o arco e o texto ficam vermelhos, o gráfico mostra `+X ml` e a tela exibe uma faixa de alerta. O alerta some sozinho se a meta for aumentada.
 - **Dois modos de leitura**: tocar no gráfico alterna entre percentual (`85%`) e absoluto (`1700/2000 ml`).
 - **Remoção de registros**: um toque longo em um item da lista pede confirmação e remove o registro, recalculando o acumulado a partir dos registros restantes.
@@ -23,7 +25,7 @@ Projeto acadêmico, feito para praticar views customizadas, animações e persis
 | Linguagem | Java 11 |
 | Plataforma | Android (`minSdk` 24, `compileSdk` e `targetSdk` 37) |
 | Build | Gradle 9.6 (wrapper) e Android Gradle Plugin 9.4.1 |
-| UI | AppCompat e Material 3 (tema claro) |
+| UI | AppCompat e Material 3 (tema escuro), formas e vetores em XML (`drawable`) |
 | Desenho | `View` customizada com `Canvas` e `Paint` |
 | Animação | `ValueAnimator` |
 | Persistência | `SharedPreferences` com lista de registros em JSON (`org.json`) |
@@ -39,7 +41,8 @@ app/src/main/
 │   ├── WaterEntry.java          Modelo de um registro (volume + horário)
 │   └── WaterStorage.java        Leitura e gravação dos dados
 └── res/
-    ├── layout/activity_main.xml
+    ├── layout/                  activity_main (tela) e item_entry (linha de registro)
+    ├── drawable/                Cartões, tiles, campos, alerta e ícone de gota
     └── values/                  attrs, colors, strings e themes
 
 app/src/androidTest/
