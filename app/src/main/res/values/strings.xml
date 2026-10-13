@@ -11,9 +11,14 @@
     <string name="add_entry">Registrar</string>
     <string name="total_format">Acumulado: %1$d / %2$d ml</string>
     <string name="alert_banner">⚠ Meta ultrapassada em %1$d ml</string>
-    <string name="entries_title">Registros de hoje</string>
+    <string name="entries_title">Registros de hoje (toque longo para remover)</string>
     <string name="entry_format">%1$s — %2$d ml</string>
     <string name="empty_entries">Nenhum registro hoje</string>
     <string name="invalid_volume">Informe um volume maior que zero</string>
     <string name="invalid_goal">Informe uma meta maior que zero</string>
+    <string name="chart_description">%1$s: %2$d%% (%3$d de %4$d ml)</string>
+    <string name="delete_entry_title">Remover registro?</string>
+    <string name="delete_entry_message">Remover %1$s — %2$d ml?</string>
+    <string name="remove">Remover</string>
+    <string name="cancel">Cancelar</string>
 </resources>

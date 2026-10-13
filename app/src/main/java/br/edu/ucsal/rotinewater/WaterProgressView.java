@@ -48,7 +48,8 @@ public class WaterProgressView extends View {
         alertColor = context.getColor(R.color.alert_red);
         readAttributes(context, attrs);
         setupPaints(context);
-        setOnClickListener(v -> toggleMode());
+        setOnClickListener(v -> setAbsoluteMode(!absoluteMode));
+        updateDescription();
     }
 
     private void readAttributes(Context context, AttributeSet attrs) {
@@ -108,17 +109,31 @@ public class WaterProgressView extends View {
         invalidate();
     }
 
+    public void setAbsoluteMode(boolean absoluteMode) {
+        this.absoluteMode = absoluteMode;
+        invalidate();
+    }
+
+    public boolean isAbsoluteMode() {
+        return absoluteMode;
+    }
+
     public boolean isOverGoal() {
         return currentValue > maxValue;
     }
 
     private void updateProgress() {
         setProgress(Math.round(currentValue * 100f / maxValue));
+        updateDescription();
     }
 
-    private void toggleMode() {
-        absoluteMode = !absoluteMode;
-        invalidate();
+    private void updateDescription() {
+        Context context = getContext();
+        setContentDescription(context.getString(R.string.chart_description,
+                context.getString(R.string.chart_title),
+                Math.round(currentValue * 100f / maxValue),
+                currentValue,
+                maxValue));
     }
 
     @Override

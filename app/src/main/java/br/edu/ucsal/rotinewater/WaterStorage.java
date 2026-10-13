@@ -59,25 +59,45 @@ public class WaterStorage {
 
     public void addEntry(int volumeMl) {
         checkNewDay();
-        try {
-            JSONArray array = new JSONArray(prefs.getString(KEY_ENTRIES, "[]"));
-            JSONObject item = new JSONObject();
-            item.put(KEY_VOLUME, volumeMl);
-            item.put(KEY_TIMESTAMP, System.currentTimeMillis());
-            array.put(item);
-            prefs.edit()
-                    .putString(KEY_ENTRIES, array.toString())
-                    .putInt(KEY_TOTAL, getTotal() + volumeMl)
-                    .apply();
-        } catch (JSONException e) {
-            resetDay();
+        List<WaterEntry> entries = getEntries();
+        entries.add(new WaterEntry(volumeMl, System.currentTimeMillis()));
+        saveEntries(entries);
+    }
+
+    public void removeEntry(int index) {
+        List<WaterEntry> entries = getEntries();
+        if (index < 0 || index >= entries.size()) {
+            return;
         }
+        entries.remove(index);
+        saveEntries(entries);
     }
 
     public void checkNewDay() {
         if (!today().equals(prefs.getString(KEY_DATE, ""))) {
             resetDay();
         }
+    }
+
+    private void saveEntries(List<WaterEntry> entries) {
+        JSONArray array = new JSONArray();
+        int total = 0;
+        try {
+            for (WaterEntry entry : entries) {
+                JSONObject item = new JSONObject();
+                item.put(KEY_VOLUME, entry.getVolumeMl());
+                item.put(KEY_TIMESTAMP, entry.getTimestamp());
+                array.put(item);
+                total += entry.getVolumeMl();
+            }
+        } catch (JSONException e) {
+            resetDay();
+            return;
+        }
+        prefs.edit()
+                .putString(KEY_ENTRIES, array.toString())
+                .putInt(KEY_TOTAL, total)
+                .apply();
     }
 
     private void resetDay() {

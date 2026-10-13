@@ -2,6 +2,7 @@ package br.edu.ucsal.rotinewater;
 
 import android.os.Bundle;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -10,6 +11,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -20,6 +22,8 @@ import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final String STATE_ABSOLUTE_MODE = "absolute_mode";
 
     private WaterStorage storage;
     private WaterProgressView waterView;
@@ -35,15 +39,26 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+        View root = findViewById(R.id.main);
+        int basePadding = root.getPaddingLeft();
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            v.setPadding(
+                    basePadding + systemBars.left,
+                    basePadding + systemBars.top,
+                    basePadding + systemBars.right,
+                    basePadding + systemBars.bottom);
             return insets;
         });
 
         storage = new WaterStorage(this);
         bindViews();
-        etGoal.setText(String.valueOf(storage.getGoal()));
+
+        if (savedInstanceState == null) {
+            etGoal.setText(String.valueOf(storage.getGoal()));
+        } else {
+            waterView.setAbsoluteMode(savedInstanceState.getBoolean(STATE_ABSOLUTE_MODE));
+        }
         refreshScreen();
     }
 
@@ -52,6 +67,12 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         storage.checkNewDay();
         refreshScreen();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(STATE_ABSOLUTE_MODE, waterView.isAbsoluteMode());
     }
 
     private void bindViews() {
@@ -70,6 +91,10 @@ public class MainActivity extends AppCompatActivity {
         ListView lvEntries = findViewById(R.id.lvEntries);
         lvEntries.setAdapter(entriesAdapter);
         lvEntries.setEmptyView(findViewById(R.id.tvEmpty));
+        lvEntries.setOnItemLongClickListener((parent, view, position, id) -> {
+            confirmRemoval(position);
+            return true;
+        });
     }
 
     private void saveGoal() {
@@ -79,6 +104,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         storage.setGoal(goal);
+        hideKeyboard(etGoal);
         refreshScreen();
     }
 
@@ -90,7 +116,27 @@ public class MainActivity extends AppCompatActivity {
         }
         storage.addEntry(volume);
         etVolume.setText("");
+        hideKeyboard(etVolume);
         refreshScreen();
+    }
+
+    private void confirmRemoval(int position) {
+        List<WaterEntry> entries = storage.getEntries();
+        int index = entries.size() - 1 - position;
+        if (index < 0 || index >= entries.size()) {
+            return;
+        }
+        WaterEntry entry = entries.get(index);
+        String time = timeFormat.format(entry.getTimestamp());
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.delete_entry_title)
+                .setMessage(getString(R.string.delete_entry_message, time, entry.getVolumeMl()))
+                .setPositiveButton(R.string.remove, (dialog, which) -> {
+                    storage.removeEntry(index);
+                    refreshScreen();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     private int readPositiveNumber(EditText field) {
@@ -99,6 +145,14 @@ public class MainActivity extends AppCompatActivity {
             return Math.max(value, 0);
         } catch (NumberFormatException e) {
             return 0;
+        }
+    }
+
+    private void hideKeyboard(View view) {
+        view.clearFocus();
+        InputMethodManager imm = getSystemService(InputMethodManager.class);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
     }
 
