@@ -4,12 +4,17 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.SweepGradient;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
+
+import androidx.core.graphics.ColorUtils;
 
 public class WaterProgressView extends View {
 
@@ -18,11 +23,17 @@ public class WaterProgressView extends View {
     private static final long ANIMATION_DURATION_MS = 700;
     private static final float START_ANGLE = -90f;
     private static final float DEGREES_PER_PERCENT = 3.6f;
+    private static final float STROKE_RATIO = 0.09f;
+    private static final float KNOB_RATIO = 0.22f;
+    private static final float GRADIENT_LIGHTEN = 0.45f;
+    private static final int SECONDARY_TEXT_ALPHA = 150;
 
     private final Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint knobPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF arcBounds = new RectF();
+    private final Matrix shaderMatrix = new Matrix();
 
     private int progressColor;
     private int textColor;
@@ -32,6 +43,12 @@ public class WaterProgressView extends View {
     private float animatedProgress = 0f;
     private boolean absoluteMode = false;
     private ValueAnimator animator;
+
+    private SweepGradient progressShader;
+    private boolean shaderDirty = true;
+    private boolean shaderOverGoal;
+    private float shaderCenterX;
+    private float shaderCenterY;
 
     public WaterProgressView(Context context) {
         this(context, null);
@@ -43,8 +60,8 @@ public class WaterProgressView extends View {
 
     public WaterProgressView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        progressColor = context.getColor(R.color.water_blue);
-        textColor = context.getColor(R.color.text_dark);
+        progressColor = context.getColor(R.color.accent);
+        textColor = context.getColor(R.color.text_primary);
         alertColor = context.getColor(R.color.alert_red);
         readAttributes(context, attrs);
         setupPaints(context);
@@ -68,9 +85,11 @@ public class WaterProgressView extends View {
 
     private void setupPaints(Context context) {
         trackPaint.setStyle(Paint.Style.STROKE);
-        trackPaint.setColor(context.getColor(R.color.track_gray));
+        trackPaint.setColor(context.getColor(R.color.track));
         progressPaint.setStyle(Paint.Style.STROKE);
         progressPaint.setStrokeCap(Paint.Cap.ROUND);
+        knobPaint.setStyle(Paint.Style.FILL);
+        knobPaint.setColor(Color.WHITE);
         textPaint.setTextAlign(Paint.Align.CENTER);
     }
 
@@ -101,6 +120,7 @@ public class WaterProgressView extends View {
 
     public void setProgressColor(int color) {
         progressColor = color;
+        shaderDirty = true;
         invalidate();
     }
 
@@ -120,6 +140,10 @@ public class WaterProgressView extends View {
 
     public boolean isOverGoal() {
         return currentValue > maxValue;
+    }
+
+    private boolean isGoalReached() {
+        return currentValue == maxValue;
     }
 
     private void updateProgress() {
@@ -162,15 +186,12 @@ public class WaterProgressView extends View {
         float centerX = getPaddingLeft() + availableWidth / 2f;
         float centerY = getPaddingTop() + availableHeight / 2f;
 
-        boolean overGoal = isOverGoal();
-        int activeColor = overGoal ? alertColor : progressColor;
-
-        drawArcs(canvas, size, centerX, centerY, activeColor);
-        drawTexts(canvas, size, centerX, centerY, overGoal);
+        drawRing(canvas, size, centerX, centerY);
+        drawTexts(canvas, size, centerX, centerY);
     }
 
-    private void drawArcs(Canvas canvas, float size, float centerX, float centerY, int activeColor) {
-        float strokeWidth = size * 0.09f;
+    private void drawRing(Canvas canvas, float size, float centerX, float centerY) {
+        float strokeWidth = size * STROKE_RATIO;
         float radius = size / 2f - strokeWidth / 2f;
         arcBounds.set(centerX - radius, centerY - radius, centerX + radius, centerY + radius);
 
@@ -178,29 +199,65 @@ public class WaterProgressView extends View {
         canvas.drawArc(arcBounds, 0f, 360f, false, trackPaint);
 
         float sweep = Math.min(animatedProgress, 100f) * DEGREES_PER_PERCENT;
-        if (sweep > 0f) {
-            progressPaint.setStrokeWidth(strokeWidth);
-            progressPaint.setColor(activeColor);
-            canvas.drawArc(arcBounds, START_ANGLE, sweep, false, progressPaint);
+        if (sweep <= 0f) {
+            return;
         }
+
+        updateShader(centerX, centerY, isOverGoal());
+        progressPaint.setStrokeWidth(strokeWidth);
+        canvas.drawArc(arcBounds, START_ANGLE, sweep, false, progressPaint);
+
+        double endAngle = Math.toRadians(START_ANGLE + sweep);
+        float knobX = centerX + radius * (float) Math.cos(endAngle);
+        float knobY = centerY + radius * (float) Math.sin(endAngle);
+        canvas.drawCircle(knobX, knobY, strokeWidth * KNOB_RATIO, knobPaint);
     }
 
-    private void drawTexts(Canvas canvas, float size, float centerX, float centerY, boolean overGoal) {
-        float maxTextWidth = size * 0.62f;
+    private void updateShader(float centerX, float centerY, boolean overGoal) {
+        boolean unchanged = !shaderDirty
+                && shaderOverGoal == overGoal
+                && shaderCenterX == centerX
+                && shaderCenterY == centerY;
+        if (progressShader != null && unchanged) {
+            return;
+        }
+        int endColor = overGoal ? alertColor : progressColor;
+        int startColor = ColorUtils.blendARGB(endColor, Color.WHITE, GRADIENT_LIGHTEN);
+        progressShader = new SweepGradient(centerX, centerY,
+                new int[]{startColor, endColor, endColor},
+                new float[]{0f, 0.55f, 1f});
+        shaderMatrix.setRotate(START_ANGLE, centerX, centerY);
+        progressShader.setLocalMatrix(shaderMatrix);
+        progressPaint.setShader(progressShader);
+        shaderDirty = false;
+        shaderOverGoal = overGoal;
+        shaderCenterX = centerX;
+        shaderCenterY = centerY;
+    }
+
+    private void drawTexts(Canvas canvas, float size, float centerX, float centerY) {
+        float maxTextWidth = size * 0.6f;
+        boolean overGoal = isOverGoal();
+        int secondaryColor = ColorUtils.setAlphaComponent(textColor, SECONDARY_TEXT_ALPHA);
 
         textPaint.setTypeface(Typeface.DEFAULT);
-        textPaint.setColor(textColor);
+        textPaint.setColor(secondaryColor);
         drawCenteredText(canvas, getContext().getString(R.string.chart_title),
-                centerX, centerY - size * 0.22f, size * 0.06f, maxTextWidth);
+                centerX, centerY - size * 0.23f, size * 0.058f, maxTextWidth);
 
         textPaint.setTypeface(Typeface.DEFAULT_BOLD);
         textPaint.setColor(overGoal ? alertColor : textColor);
-        drawCenteredText(canvas, buildMainText(), centerX, centerY + size * 0.02f, size * 0.17f, maxTextWidth);
+        drawCenteredText(canvas, buildMainText(), centerX, centerY, size * 0.2f, maxTextWidth);
 
         if (overGoal) {
-            String alertText = getContext().getString(R.string.chart_alert, currentValue - maxValue);
-            drawCenteredText(canvas, alertText, centerX, centerY + size * 0.22f, size * 0.06f, maxTextWidth);
+            textPaint.setColor(alertColor);
+        } else if (isGoalReached()) {
+            textPaint.setColor(progressColor);
+        } else {
+            textPaint.setTypeface(Typeface.DEFAULT);
+            textPaint.setColor(secondaryColor);
         }
+        drawCenteredText(canvas, buildSubText(), centerX, centerY + size * 0.21f, size * 0.056f, maxTextWidth);
     }
 
     private String buildMainText() {
@@ -208,6 +265,17 @@ public class WaterProgressView extends View {
             return getContext().getString(R.string.absolute_format, currentValue, maxValue);
         }
         return getContext().getString(R.string.percent_format, Math.round(animatedProgress));
+    }
+
+    private String buildSubText() {
+        Context context = getContext();
+        if (isOverGoal()) {
+            return context.getString(R.string.chart_alert, currentValue - maxValue);
+        }
+        if (isGoalReached()) {
+            return context.getString(R.string.chart_reached);
+        }
+        return context.getString(R.string.chart_remaining, maxValue - currentValue);
     }
 
     private void drawCenteredText(Canvas canvas, String text, float x, float y, float desiredSize, float maxWidth) {
